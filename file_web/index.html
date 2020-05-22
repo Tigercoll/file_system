@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理系统</title>
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <!-- 引入组件库 -->
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <el-upload class="upload-demo" ref="upload" :action=" 'http://127.0.0.1:3000/api/private/v1/upload/' + file_path " multiple :auto-upload="false" :on-success='handleAvatarSuccess'>
+            <el-button slot="trigger" size="small" type="primary">选取文件</el-button>
+            <el-button style="margin-left: 10px;" size="small" type="success" @click="submitUpload">上传到服务器</el-button>
+        </el-upload>
+        <el-breadcrumb separator-class="el-icon-arrow-right" style="margin-top: 20px;">
+            <el-breadcrumb-item :key='index' v-for='(item,index) in history_list'>
+                <el-tooltip class="item" effect="dark" :content=" '点我返回' + item " placement="top-start">
+                    <el-button @click='go_back(index)' size="mini">{{item}}</el-button>
+                </el-tooltip>
+        </el-breadcrumb>
+        <template>
+            <el-table
+              :data="file_list"
+              stripe
+              style="width: 100%">
+              <el-table-column
+                label="名称"
+               >
+               <template slot-scope="scope">
+                <span style="margin-left: 10px;cursor: pointer;" @click="get_new_file_list(scope.row)">
+                <i class="el-icon-folder" style="font-size: 20px;color: yellowgreen;" v-if='scope.row.file_type=="dir"'></i>
+                <i class="el-icon-tickets" style="font-size: 20px;color: aqua;" v-else></i>
+               {{ scope.row.name }}</span>
+              </template>
+        </el-table-column>
+        <el-table-column prop="size" label="大小">
+        </el-table-column>
+        <el-table-column prop="update_time" label="更新时间">
+        </el-table-column>
+        <el-table-column label="操作">
+            <template slot="header">
+                    <el-button round type="success" size="mini" @click='addDialogVisible=true'>添加文件夹</el-button>
+                  </template>
+            <template slot-scope='scope'>
+                <el-button round type="warning" size="mini" @click='rename(scope.row.name)'>重命名</el-button>
+                <el-button round type="danger" size="mini" @click='del_file(scope.row)'>删除</el-button>
+            </template>
+        </el-table-column>
+        </el-table>
+        </template>
+        <!-- 添加文件夹 -->
+        <el-dialog :title="is_new_name?'重命名':'添加文件夹'" :visible.sync="addDialogVisible" width="30%" @close='resetForm'>
+            <el-form ref="addFormRef" :model="addForm" label-width="80px" :rules="rules">
+                <el-form-item label="名称:" prop='name'>
+                    <el-input v-model="addForm.name" :disabled="is_new_name"></el-input>
+                </el-form-item>
+                <el-form-item label="重命名:" prop='new_name' v-if='is_new_name'>
+                    <el-input v-model="addForm.new_name"></el-input>
+                </el-form-item>
+            </el-form>
+            <span slot="footer" class="dialog-footer">
+    <el-button @click="addDialogVisible = false">取 消</el-button>
+    <el-button type="primary" @click="add_folder">确 定</el-button>
+  </span>
+        </el-dialog>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                file_list: [],
+                base_url: 'http://127.0.0.1:3000/api/private/v1/files/',
+                file_path: '',
+                history_list: ['首页'],
+                addDialogVisible: false,
+                is_new_name: false,
+                action_url: '',
+                addForm: {
+                    name: '',
+                    new_name: ''
+                },
+                rules: {
+                    name: [{
+                        required: true,
+                        message: '请输入名称',
+                        trigger: 'blur'
+                    }],
+                    new_name: [{
+                        required: true,
+                        message: '请输入名称',
+                        trigger: 'blur'
+                    }]
+                }
+            },
+            created() {
+                this.get_file_list(this.base_url)
+            },
+            methods: {
+                // 获取文件夹列表
+                async get_file_list(url) {
+                    const {
+                        data: result
+                    } = await axios.get(url)
+                    if (result.status !== 200) {
+                        this.$message.error(result.msg)
+                        return
+                    }
+                    this.file_list = result.data
+                },
+                // 点击上传文件
+                submitUpload() {
+                    this.$refs.upload.submit();
+                },
+                // 上传成功钩子函数
+                handleAvatarSuccess(res, file, fileList) {
+                    if (res.status !== 200) {
+                        this.$message.error(res.msg)
+                        return
+                    }
+                    var index = fileList.indexOf(file)
+                    fileList.splice(index, 1)
+                    this.$message.success(res.msg)
+                    this.get_file_list(this.base_url + this.file_path)
+                },
+                // 获取新的文件夹列表通过name
+                get_new_file_list(row) {
+                    if (row.file_type === 'dir') {
+                        this.history_list.push(row.name)
+                        this.file_path = this.file_path + row.name + '/'
+                        this.get_file_list(this.base_url + this.file_path)
+                    } else {
+                        window.open(this.base_url + this.file_path + row.name)
+                    }
+                },
+                // 返回父文件夹
+                go_back(index) {
+                    this.file_path = this.history_list.slice(1, index + 1).join('/') + '/'
+                    this.history_list = this.history_list.slice(0, index + 1)
+                    this.get_file_list(this.base_url + this.file_path)
+                },
+                // 添加文件夹
+                add_folder() {
+                    this.$refs.addFormRef.validate(
+                        async valid => {
+                            if (!valid) {
+                                return
+                            }
+                            const {
+                                data: result
+                            } = await axios.post(this.base_url + this.file_path, this.addForm)
+                            console.log(result)
+                            if (result.status !== 201) {
+                                this.$message.error(result.msg)
+                                return
+                            }
+
+                            this.$message.success(result.msg)
+                            this.get_file_list(this.base_url + this.file_path)
+                            this.addDialogVisible = false
+                        }
+                    )
+                },
+                // 重置表单 
+                resetForm() {
+                    console.log(1)
+                    this.$refs.addFormRef.resetFields();
+                    this.is_new_name = false
+                },
+                // 重命名
+                rename(name) {
+                    this.addForm.name = name
+                    this.is_new_name = true
+                    this.addDialogVisible = true
+                },
+                // 删除文件或文件夹
+                del_file(row) {
+                    this.$confirm('此操作将永久删除该文件, 是否继续?', '警告', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(async() => {
+                        if (row.file_type === 'dir' && row.size !== '0.00 B') {
+                            throw '文件夹不为空,不能删除'
+                        }
+                        const {
+                            data: result
+                        } = await axios.delete(this.base_url + this.file_path + row.name)
+                        if (result.status !== 204) {
+                            throw result.msg
+                        }
+                        this.get_file_list(this.base_url + this.file_path)
+                        this.$message({
+                            type: 'success',
+                            message: '删除成功!'
+                        });
+                    }).catch((msg) => {
+
+                        this.$message({
+                            type: 'error',
+                            message: msg === 'cancel' ? '取消删除' : msg
+                        });
+                    });
+                }
+            },
+        })
+    </script>
+</body>
+
+</html>

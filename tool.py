@@ -7,7 +7,7 @@ def get_update_time(file):
 # 转化size
 def change_size(size):
     count = 0
-    dic = {0: '', 1: 'KB', 2: 'MB', 3: 'GB'}
+    dic = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB'}
     while size > 1024:
         size = size / 1024
         count += 1
