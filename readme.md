@@ -8,6 +8,12 @@
 
 + 数据返回格式统一使用JSON
 
+修改settings里的配置,注意文件夹路径必须存在
+
+运行python main 启动,
+
+打开 file_web下的index.html即可查看
+
 ### 支持的请求方法
 
 - GET（SELECT）：从服务器取出资源（一项或多项）。
