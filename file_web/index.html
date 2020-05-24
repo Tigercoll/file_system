@@ -18,18 +18,26 @@
         <el-upload class="upload-demo" ref="upload" :action=" 'http://127.0.0.1:3000/api/private/v1/upload/' + file_path " multiple :auto-upload="false" :on-success='handleAvatarSuccess'>
             <el-button slot="trigger" size="small" type="primary">选取文件</el-button>
             <el-button style="margin-left: 10px;" size="small" type="success" @click="submitUpload">上传到服务器</el-button>
+            <el-button style="margin-left: 10px;" size="small" type="info" v-show='show_copy_btn' @click='copy_data'>复制</el-button>
+            <el-button style="margin-left: 10px;" size="small" type="warning" v-show='show_copy_btn' @click='copy_or_move("copy")'>粘贴</el-button>
+            <el-button style="margin-left: 10px;" size="small" type="danger" v-show='show_copy_btn' @click='copy_or_move("move")'>移动</el-button>
+
         </el-upload>
         <el-breadcrumb separator-class="el-icon-arrow-right" style="margin-top: 20px;">
             <el-breadcrumb-item :key='index' v-for='(item,index) in history_list'>
                 <el-tooltip class="item" effect="dark" :content=" '点我返回' + item " placement="top-start">
                     <el-button @click='go_back(index)' size="mini">{{item}}</el-button>
                 </el-tooltip>
+            </el-breadcrumb-item>
         </el-breadcrumb>
         <template>
             <el-table
               :data="file_list"
               stripe
-              style="width: 100%">
+              style="width: 100%"
+              @select='slectHandler'
+              @select-all='slectHandler'>
+              <el-table-column type='selection'></el-table-column>
               <el-table-column
                 label="名称"
                >
@@ -82,6 +90,9 @@
                 history_list: ['首页'],
                 addDialogVisible: false,
                 is_new_name: false,
+                select_data: [],
+                item_list: [],
+                show_copy_btn: false,
                 action_url: '',
                 addForm: {
                     name: '',
@@ -142,7 +153,11 @@
                 },
                 // 返回父文件夹
                 go_back(index) {
-                    this.file_path = this.history_list.slice(1, index + 1).join('/') + '/'
+                    if (index === 0) {
+                        this.file_path = ''
+                    } else {
+                        this.file_path = this.history_list.slice(1, index + 1).join('/') + '/'
+                    }
                     this.history_list = this.history_list.slice(0, index + 1)
                     this.get_file_list(this.base_url + this.file_path)
                 },
@@ -208,6 +223,50 @@
                             message: msg === 'cancel' ? '取消删除' : msg
                         });
                     });
+                },
+                // 获取对应的行
+                slectHandler(selection) {
+                    if (selection.length === 0) {
+                        this.show_copy_btn = false
+                    } else {
+                        this.show_copy_btn = true
+                    }
+                    this.select_data = selection
+                },
+                // 处理数据并保存
+                copy_data() {
+                    // 因为选中才显示,所以省去了判断是否选中的麻烦
+                    this.item_list = []
+                    this.select_data.forEach(element => {
+                        this.item_list.push(this.file_path + element.name)
+                    })
+
+                    this.$message.success('复制成功')
+                },
+                // 粘贴或移动,通过传进来的参数判断
+                async copy_or_move(item_type) {
+                    //   先判断是否点击了复制按钮
+                    if (this.item_list.length === 0) {
+                        this.$message.error('请先点击复制按钮,来确定你需要' + (item_type === 'move' ? '移动' : '粘贴') + '的文件或文件夹')
+                        return
+                    }
+                    // 向后端发送API请求
+                    const {
+                        data: result
+                    } = await axios.post('http://127.0.0.1:3000/api/private/v1/moveorcopy/' + this.file_path, {
+                        item_list: this.item_list,
+                        item_type: item_type
+                    })
+                    if (result.status !== 200) {
+                        this.$message.error(result.msg)
+                        return
+                    }
+                    // 复制完之后隐藏按钮
+                    this.get_file_list(this.base_url + this.file_path)
+                    this.show_copy_btn = false
+                    this.$message.succsee(result.msg)
+
+
                 }
             },
         })

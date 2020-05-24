@@ -161,3 +161,59 @@ def del_files(file_path:str):
         status_data.msg=traceback.format_exc()
         status_data.status=500
         return status_data.to_dict()
+
+
+from typing import List
+# 移动或者粘贴文件
+class CopyOrMoveItem(BaseModel):
+    item_list:List
+    item_type:str
+
+def copy_dir(src,dest):
+    # 目录是否存在
+    if not os.path.exists(dest):
+        os.mkdir(dest)
+    src_list = os.listdir(src)
+    for item in src_list:
+        # 如果是目录就递归
+        if os.path.isdir(os.path.join(src,item)):
+            copy_dir(os.path.join(src,item),os.path.join(dest,item))
+        else:
+            shutil.copy(os.path.join(src,item),dest)
+
+
+
+@router.post('/moveorcopy/{file_path:path}')
+def move_or_copy(copy_or_move_item:CopyOrMoveItem,file_path:str=None):
+    status_date = StatusData()
+    print(11)
+    # 判断是移动还是粘贴
+    try:
+        if copy_or_move_item.item_type=='move':
+            for item in copy_or_move_item.item_list:
+                # 判断文件或文件夹是否已存在
+                _,file_name = os.path.split(item)
+                if os.path.exists(BASE_FILE_PATH+file_path+file_name):
+                # 存在就报错
+                    raise Exception(file_name+'已存在')
+                shutil.move(BASE_FILE_PATH+item,BASE_FILE_PATH+file_path)
+            status_date.msg='移动成功'
+        elif copy_or_move_item.item_type=='copy':
+            # 复制分两种,一种是文件,一种是目录
+            for item in copy_or_move_item.item_list:
+                _, file_name = os.path.split(item)
+                if os.path.exists(BASE_FILE_PATH  + file_path + file_name):
+                    # 存在就报错
+                    raise Exception(file_name + '已存在')
+                if os.path.isfile(BASE_FILE_PATH+item):
+                    # 文件就直接复制
+                    shutil.copy(BASE_FILE_PATH+item,BASE_FILE_PATH+file_path)
+                else:
+                    # 文件的话就要递归复制
+                    copy_dir(BASE_FILE_PATH+item,BASE_FILE_PATH+file_path+file_name)
+            status_date.msg='粘贴成功'
+    except Exception as e:
+        print(traceback.format_exc())
+        status_date.msg=str(e)
+        status_date.status=500
+    return status_date.to_dict()
